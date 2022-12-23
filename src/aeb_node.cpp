@@ -1,5 +1,6 @@
 #include "aeb_ros/aeb_node.h"
 #include "aeb_ros/util.hpp"
+#include "rclcpp/qos.hpp"
 #include <functional>
 #include <tuple>
 
@@ -51,6 +52,22 @@ AebNode::AebNode(const rclcpp::NodeOptions &options) : rclcpp::Node("Aeb", optio
     this->_tf_buff = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     this->_tf_listen = std::make_unique<tf2_ros::TransformListener>(*this->_tf_buff);
 
+
+    // Keep attempting transform until link appears (this avoids crashing while sim is loading)
+    while (true) {
+        try {
+            _tf_buff->lookupTransform(this->_lidar_frame, "base_link", rclcpp::Time{0});
+        }
+        catch (...) {
+            RCLCPP_ERROR(this->get_logger(), "Errored on frame transform, attempting again...");
+            using namespace std::chrono_literals;
+            // Avoid spamming output
+            rclcpp::sleep_for(500ms);
+            continue;
+        }
+        break;
+    }
+
     auto basetlidar = _tf_buff->lookupTransform(this->_lidar_frame, "base_link", rclcpp::Time{0});
 
     this->_aeb = std::make_unique<Aeb<71>>(0, 0, this->_wheelbase,
@@ -59,10 +76,10 @@ AebNode::AebNode(const rclcpp::NodeOptions &options) : rclcpp::Node("Aeb", optio
                                                      static_cast<float>(-basetlidar.transform.translation.y)},
                                            this->_min_ttc, this->_step_size);
 
-    this->_ls_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10,
+    this->_ls_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", rclcpp::QoS(10).best_effort(),
                                                                            std::bind(&AebNode::handle_scan, this,
                                                                                      std::placeholders::_1));
-    this->_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10,
+    this->_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", rclcpp::QoS(10).best_effort(),
                                                                          std::bind(&AebNode::handle_odom, this,
                                                                                    std::placeholders::_1));
     this->_estop_pub = this->create_publisher<std_msgs::msg::Bool>("/should_estop", 10);
@@ -79,7 +96,8 @@ void AebNode::handle_scan(sensor_msgs::msg::LaserScan::SharedPtr scan) {
     std::vector<KartPoint> points{};
 
     // Keep in bounds
-    if (start >= 360 - 25 || start <= 25 || end >= 360 - 25 || end <= 25) {
+    //if (start >= 360 - 25 || start <= 25 || end >= 360 - 25 || end <= 25) {
+        RCLCPP_INFO(this->get_logger(), "Scan: s %f e %f", start, end);
         RCLCPP_DEBUG(this->get_logger(), "Accepted scan!");
         last_scan_in_bounds = true;
 
@@ -96,11 +114,11 @@ void AebNode::handle_scan(sensor_msgs::msg::LaserScan::SharedPtr scan) {
         }
 
         this->_aeb->add_points(points.begin(), points.end());
-    }
-        // Run AEB if we have enough scans
-    else if (last_scan_in_bounds) {
+    //}
+        // Run AEB if we have enough scans TODO scans from gazebo are weird
+    //else if (last_scan_in_bounds) {
         last_scan_in_bounds = false;
-        RCLCPP_DEBUG(this->get_logger(), "Spawning AEB!");
+        RCLCPP_INFO(this->get_logger(), "Spawning AEB!");
 
         auto [collides, _] = this->_aeb->collision_check();
 
@@ -110,10 +128,11 @@ void AebNode::handle_scan(sensor_msgs::msg::LaserScan::SharedPtr scan) {
             msg.data = true;
             this->_estop_pub->publish(msg);
         }
-    }
+    //}
 }
 
 void AebNode::handle_odom(nav_msgs::msg::Odometry::SharedPtr odom) {
+    RCLCPP_INFO(this->get_logger(), "Accepted odom!");
     auto vel = odom->twist.twist.linear.x;
     auto steering = convert_trans_rot_vel_to_steering_angle(vel, odom->twist.twist.angular.z, this->_wheelbase);
     // Pass odom settings into AEB
