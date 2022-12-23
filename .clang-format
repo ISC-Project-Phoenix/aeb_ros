@@ -1,0 +1,28 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+
+TabWidth: 2
+IndentWidth: 2
+AccessModifierOffset: -4
+BraceWrapping:
+  AfterCaseLabel:         true
+  AfterClass:             true
+  AfterControlStatement:  true
+  AfterEnum:              true
+  AfterFunction:          true
+  AfterNamespace:         true
+  AfterObjCDeclaration:   true
+  AfterStruct:            true
+  AfterUnion:             true
+  AfterExternBlock:       true
+  BeforeCatch:            true
+  BeforeElse:             true
+  IndentBraces:           false
+BreakBeforeBraces: Custom
+ColumnLimit: 80
+DerivePointerAlignment: false
+SortIncludes:    true
+PointerAlignment: Left
+ReflowComments: false
+...
