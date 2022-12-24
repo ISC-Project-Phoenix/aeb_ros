@@ -3,26 +3,26 @@ Language: Cpp
 BasedOnStyle: Google
 
 TabWidth: 2
-IndentWidth: 2
+IndentWidth: 4
 AccessModifierOffset: -4
 BraceWrapping:
-  AfterCaseLabel:         true
-  AfterClass:             true
-  AfterControlStatement:  true
-  AfterEnum:              true
-  AfterFunction:          true
-  AfterNamespace:         true
-  AfterObjCDeclaration:   true
-  AfterStruct:            true
-  AfterUnion:             true
-  AfterExternBlock:       true
-  BeforeCatch:            true
-  BeforeElse:             true
+  AfterCaseLabel:         false
+  AfterClass:             false
+  AfterControlStatement:  "false"
+  AfterEnum:              false
+  AfterFunction:          false
+  AfterNamespace:         false
+  AfterObjCDeclaration:   false
+  AfterStruct:            false
+  AfterUnion:             false
+  AfterExternBlock:       false
+  BeforeCatch:            false
+  BeforeElse:             false
   IndentBraces:           false
 BreakBeforeBraces: Custom
-ColumnLimit: 80
+ColumnLimit: 120
 DerivePointerAlignment: false
-SortIncludes:    true
+SortIncludes: "CaseInsensitive"
 PointerAlignment: Left
 ReflowComments: false
 ...

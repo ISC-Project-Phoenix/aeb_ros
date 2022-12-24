@@ -1,7 +1,7 @@
 #pragma once
 
-#include <regex>
 #include <optional>
+#include <regex>
 
 /// Finds the appropriate steering angle for some turning radius, which is defined by the
 /// transient velocity of the vehicle along that curve (just the current velocity in this instance),
@@ -21,12 +21,12 @@ constexpr double convert_trans_rot_vel_to_steering_angle(double vel, double omeg
 }
 
 /// Parses the collision box as [[f32, f32], [f32, f32]] using regex. Returns None on error.
-auto parse_collision_box(
-        const std::string &str) -> std::optional<std::tuple<std::tuple<float, float>, std::tuple<float, float>>> {
+auto parse_collision_box(const std::string& str)
+    -> std::optional<std::tuple<std::tuple<float, float>, std::tuple<float, float>>> {
     // Oh boy, matches [[f32, f32], [f32, f32]] ignoring whitespaces
     static std::regex coll_reg{
-            R"(\[\s*\[\s*([+|-]?\d*\.?\d*)\s*,\s*([+|-]?\d*\.?\d*)\s*\]\s*,\s*\[\s*([+|-]?\d*\.?\d*)\s*,\s*([+|-]?\d*\.?\d*)\s*\]\s*\])",
-            std::regex_constants::icase};
+        R"(\[\s*\[\s*([+|-]?\d*\.?\d*)\s*,\s*([+|-]?\d*\.?\d*)\s*\]\s*,\s*\[\s*([+|-]?\d*\.?\d*)\s*,\s*([+|-]?\d*\.?\d*)\s*\]\s*\])",
+        std::regex_constants::icase};
 
     std::smatch res{};
     auto tuple1 = std::make_tuple(0.0, 0.0);
@@ -45,9 +45,7 @@ auto parse_collision_box(
     }
 }
 
-constexpr double rad_to_deg(double val) {
-    return val / M_PI * 180;
-}
+constexpr double rad_to_deg(double val) { return val / M_PI * 180; }
 
 /// Converts lidarscan readings angle into a standard polar frame.
 double lidarscan_polar(double reading) {
