@@ -7,6 +7,7 @@
 using namespace LineDrawing;
 
 AebNode::AebNode(const rclcpp::NodeOptions &options) : rclcpp::Node("Aeb", options) {
+    // Node setup
     {
         auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
         param_desc.description = "Wheelbase of the vehicle";
@@ -52,7 +53,6 @@ AebNode::AebNode(const rclcpp::NodeOptions &options) : rclcpp::Node("Aeb", optio
     this->_tf_buff = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     this->_tf_listen = std::make_unique<tf2_ros::TransformListener>(*this->_tf_buff);
 
-
     // Keep attempting transform until link appears (this avoids crashing while sim is loading)
     while (true) {
         try {
@@ -82,57 +82,66 @@ AebNode::AebNode(const rclcpp::NodeOptions &options) : rclcpp::Node("Aeb", optio
     this->_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", rclcpp::QoS(10).best_effort(),
                                                                          std::bind(&AebNode::handle_odom, this,
                                                                                    std::placeholders::_1));
-    this->_estop_pub = this->create_publisher<std_msgs::msg::Bool>("/should_estop", 10);
+    this->_estop_pub = this->create_publisher<std_msgs::msg::UInt32>("/should_estop", 10);
 }
 
 void AebNode::handle_scan(sensor_msgs::msg::LaserScan::SharedPtr scan) {
     static bool last_scan_in_bounds = false;
+    static double last_start = 0.0;
 
-    auto start = dtor(scan->angle_min);
-    auto end = dtor(scan->angle_max);
-    auto step = dtor(scan->angle_increment);
+    auto start = rad_to_deg(scan->angle_min);
+    auto end = rad_to_deg(scan->angle_max);
+    auto step = rad_to_deg(scan->angle_increment);
 
-    float current_angle = start;
-    std::vector<KartPoint> points{};
-
-    // Keep in bounds
-    //if (start >= 360 - 25 || start <= 25 || end >= 360 - 25 || end <= 25) {
-        RCLCPP_INFO(this->get_logger(), "Scan: s %f e %f", start, end);
-        RCLCPP_DEBUG(this->get_logger(), "Accepted scan!");
+    // Keep in bounds, or accept if all scans come in as full scans (such as in gazebo)
+    if ((start >= 360 - 25 && start <= 360) || (start <= 25 && start >= 0) || (end >= 360 - 25 && end <= 360) ||
+        (end <= 25 && end >= 0) || last_start == start) {
         last_scan_in_bounds = true;
 
-        for (auto i = 0; i < scan->ranges.size(); i++, current_angle += step) {
-            auto reading = scan->ranges[i];
+        double current_angle = start;
+        std::vector<KartPoint> points{};
+
+        // Convert scans into lib format
+        for (float reading: scan->ranges) {
             // Filter out close points
             if (reading < 0.15) {
                 continue;
             }
 
             auto polar_a = lidarscan_polar(current_angle);
-            auto kartpoint = KartPoint::from_polar(reading, polar_a);
+            auto kartpoint = KartPoint::from_polar(reading, static_cast<float>(polar_a));
             points.push_back(kartpoint);
+
+            current_angle += step;
         }
 
         this->_aeb->add_points(points.begin(), points.end());
-    //}
-        // Run AEB if we have enough scans TODO scans from gazebo are weird
-    //else if (last_scan_in_bounds) {
-        last_scan_in_bounds = false;
-        RCLCPP_INFO(this->get_logger(), "Spawning AEB!");
 
-        auto [collides, _] = this->_aeb->collision_check();
+        // If getting full scans, run AEB now to avoid starving the next else if
+        if (last_start == start) {
+            // I think this is actually cleaner
+            goto aeb;
+        }
+    }
+        // Run AEB if we have enough scans
+    else if (last_scan_in_bounds) {
+        aeb:
+        last_scan_in_bounds = false;
+
+        auto [collides, time] = this->_aeb->collision_check();
 
         // If we are going to collide, publish estop
         if (collides) {
-            auto msg = std_msgs::msg::Bool{};
-            msg.data = true;
+            auto msg = std_msgs::msg::UInt32{};
+            msg.data = static_cast<uint32_t>(time);
             this->_estop_pub->publish(msg);
         }
-    //}
+    }
+
+    last_start = start;
 }
 
 void AebNode::handle_odom(nav_msgs::msg::Odometry::SharedPtr odom) {
-    RCLCPP_INFO(this->get_logger(), "Accepted odom!");
     auto vel = odom->twist.twist.linear.x;
     auto steering = convert_trans_rot_vel_to_steering_angle(vel, odom->twist.twist.angular.z, this->_wheelbase);
     // Pass odom settings into AEB

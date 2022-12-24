@@ -4,7 +4,7 @@
 #include "aeb_cpp/aeb.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/u_int32.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 #include <memory>
@@ -37,5 +37,5 @@ private:
     /// Incoming Odom
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
     /// Sends true when we should stop
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr _estop_pub;
+    rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr _estop_pub;
 };
